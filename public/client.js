@@ -57,10 +57,39 @@ async function getTempApiKey() {
   return json.key;
 }
 
+const openAIKey = '...';
+const model = "gpt-3.5-turbo"; 
+
+
+async function getChatGPTResponse(prompt){
+  const requestOptions = {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openAIKey}`
+    },
+    body: JSON.stringify({
+        model: model,
+        messages: [{"role": "user", "content": prompt}],
+        temperature: 0.7,
+        max_tokens: 60,
+        n: 1,
+        stop: null,
+    }),
+};
+
+  const result = await fetch('https://api.openai.com/v1/chat/completions', requestOptions);
+  const json = await result.json();
+
+  return json;
+}
+
+
 window.addEventListener("load", async () => {
   const key = await getTempApiKey();
 
   const { createClient } = deepgram;
+
   const _deepgram = createClient(key);
 
   const socket = _deepgram.listen.live({ model: "nova", smart_format: true });
@@ -71,10 +100,15 @@ window.addEventListener("load", async () => {
     socket.on("Results", (data) => {
       console.log(data);
 
+      const is_final = data.is_final;
       const transcript = data.channel.alternatives[0].transcript;
 
-      if (transcript !== "")
+      if (transcript.length && !!is_final){
         captions.innerHTML = transcript ? `<span>${transcript}</span>` : "";
+        getChatGPTResponse(transcript).then(res => {
+          console.log(res.choices[0].message.content);
+        });
+      }
     });
 
     socket.on("error", (e) => console.error(e));
